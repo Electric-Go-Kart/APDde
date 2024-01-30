@@ -6,3 +6,11 @@ git clone https://github.com/luxonis/depthai-python.git
 cd depthai-python/examples
 python3 install_requirements.py
 ```
+To run the program:
+```
+python3 APDde.py
+```
+To quit the program:
+```
+q
+```
