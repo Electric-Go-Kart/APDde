@@ -7,7 +7,7 @@ import depthai as dai
 import numpy as np
 
 # Get argument first
-nnPath = str((Path(__file__).parent / Path('../models/mobilenet-ssd_openvino_2021.4_6shave.blob')).resolve().absolute())
+nnPath = str((Path(__file__).parent / Path('models/mobilenet-ssd_openvino_2021.4_6shave.blob')).resolve().absolute())
 if len(sys.argv) > 1:
     nnPath = sys.argv[1]
 
@@ -96,7 +96,7 @@ with dai.Device(pipeline) as device:
     frameDisparity = None
     detections = []
     offsetX = (monoRight.getResolutionWidth() - monoRight.getResolutionHeight()) // 2
-    color = (255, 0, 0)
+    color = (0, 255, 0) # green
     croppedFrame = np.zeros((monoRight.getResolutionHeight(), monoRight.getResolutionHeight()))
 
     def frameNorm(frame, bbox):
@@ -105,8 +105,7 @@ with dai.Device(pipeline) as device:
         return (np.clip(np.array(bbox), 0, 1) * normVals).astype(int)
 
     videoFile = open('video.h265', 'wb')
-    cv2.namedWindow("right", cv2.WINDOW_NORMAL)
-    cv2.namedWindow("manip", cv2.WINDOW_NORMAL)
+    cv2.namedWindow("disparity", cv2.WINDOW_NORMAL)
 
     while True:
         inRight = qRight.tryGet()
@@ -132,17 +131,6 @@ with dai.Device(pipeline) as device:
         if inDet is not None:
             detections = inDet.detections
 
-        if frame is not None:
-            for detection in detections:
-                if labelMap[detection.label] in includedLabels:
-                    bbox = frameNorm(croppedFrame, (detection.xmin, detection.ymin, detection.xmax, detection.ymax))
-                    bbox[::2] += offsetX
-                    cv2.putText(frame, labelMap[detection.label], (bbox[0] + 10, bbox[1] + 20), cv2.FONT_HERSHEY_TRIPLEX, 0.5, color)
-                    cv2.putText(frame, f"{int(detection.confidence * 100)}%", (bbox[0] + 10, bbox[1] + 40), cv2.FONT_HERSHEY_TRIPLEX, 0.5, color)
-                    cv2.rectangle(frame, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, 2)
-            # Show the right cam frame
-            cv2.imshow("right", frame)
-
         if frameDisparity is not None:
             for detection in detections:
                 if labelMap[detection.label] in includedLabels:
@@ -153,16 +141,6 @@ with dai.Device(pipeline) as device:
                     cv2.putText(frameDisparity, f"{int(detection.confidence * 100)}%", (bbox[0] + 10, bbox[1] + 40), cv2.FONT_HERSHEY_TRIPLEX, 0.5, color)
             # Show the disparity frame
             cv2.imshow("disparity", frameDisparity)
-
-        if frameManip is not None:
-            for detection in detections:
-                if labelMap[detection.label] in includedLabels:
-                    bbox = frameNorm(frameManip, (detection.xmin, detection.ymin, detection.xmax, detection.ymax))
-                    cv2.rectangle(frameManip, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, 2)
-                    cv2.putText(frameManip, labelMap[detection.label], (bbox[0] + 10, bbox[1] + 20), cv2.FONT_HERSHEY_TRIPLEX, 0.5, color)
-                    cv2.putText(frameManip, f"{int(detection.confidence * 100)}%", (bbox[0] + 10, bbox[1] + 40), cv2.FONT_HERSHEY_TRIPLEX, 0.5, color)
-            # Show the manip frame
-            cv2.imshow("manip", frameManip)
 
         if cv2.waitKey(1) == ord('q'):
             break
