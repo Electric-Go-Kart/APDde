@@ -7,7 +7,7 @@ import depthai as dai
 import numpy as np
 
 # Get argument first
-nnPath = str((Path(__file__).parent / Path('models/mobilenet-ssd_openvino_2021.4_6shave.blob')).resolve().absolute())
+nnPath = str((Path(__file__).parent / Path('./models/mobilenet-ssd_openvino_2021.4_6shave.blob')).resolve().absolute())
 if len(sys.argv) > 1:
     nnPath = sys.argv[1]
 
@@ -21,11 +21,14 @@ labelMap = ["background", "aeroplane", "bicycle", "bird", "boat", "bottle", "bus
 
 includedLabels = ["person", "car", "motorbike", "bicycle", "bus", "aeroplane", "background", "train"]
 
+# Baseline of OAK-D Pro as documented
+baseline = 0.075 # meters (7.5 cm)
+depth_calculated = 0
+
 # Create pipeline
 pipeline = dai.Pipeline()
 
 # Define sources and outputs
-camRgb = pipeline.create(dai.node.ColorCamera)
 videoEncoder = pipeline.create(dai.node.VideoEncoder)
 monoRight = pipeline.create(dai.node.MonoCamera)
 monoLeft = pipeline.create(dai.node.MonoCamera)
@@ -46,8 +49,6 @@ manipOut.setStreamName('manip')
 nnOut.setStreamName('nn')
 
 # Properties
-camRgb.setBoardSocket(dai.CameraBoardSocket.CAM_A)
-camRgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_1080_P)
 monoRight.setCamera("right")
 monoRight.setResolution(dai.MonoCameraProperties.SensorResolution.THE_400_P)
 monoLeft.setCamera("left")
@@ -67,7 +68,6 @@ manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
 manip.initialConfig.setResize(300, 300)
 
 # Linking
-camRgb.video.link(videoEncoder.input)
 videoEncoder.bitstream.link(videoOut.input)
 monoRight.out.link(xoutRight.input)
 monoRight.out.link(depth.right)
@@ -83,6 +83,10 @@ disparityMultiplier = 255 / depth.initialConfig.getMaxDisparity()
 
 # Connect to device and start pipeline
 with dai.Device(pipeline) as device:
+
+    calibData = device.readCalibration()
+    intrinsics = calibData.getCameraIntrinsics(dai.CameraBoardSocket.CAM_B) # left camera intrinsics (right for the device)
+    focal_length = intrinsics[0][0]
 
     queueSize = 8
     qRight = device.getOutputQueue("right", queueSize)
@@ -126,6 +130,9 @@ with dai.Device(pipeline) as device:
             # Apply color map for better visualization
             frameDisparity = inDisparity.getCvFrame()
             frameDisparity = (frameDisparity*disparityMultiplier).astype(np.uint8)
+            with np.errstate(divide='ignore', invalid='ignore'):
+                depth_calculated = (focal_length * baseline) / (frameDisparity)
+                depth_calculated[frameDisparity == 0] = 0
             frameDisparity = cv2.applyColorMap(frameDisparity, cv2.COLORMAP_JET)
 
         if inDet is not None:
@@ -139,6 +146,10 @@ with dai.Device(pipeline) as device:
                     cv2.rectangle(frameDisparity, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, 2)
                     cv2.putText(frameDisparity, labelMap[detection.label], (bbox[0] + 10, bbox[1] + 20), cv2.FONT_HERSHEY_TRIPLEX, 0.5, color)
                     cv2.putText(frameDisparity, f"{int(detection.confidence * 100)}%", (bbox[0] + 10, bbox[1] + 40), cv2.FONT_HERSHEY_TRIPLEX, 0.5, color)
+                    # Show the depth value
+                    center_x, center_y = int((bbox[0]+bbox[2])/2), int((bbox[1]+bbox[3])/2)
+                    depth_value = depth_calculated[center_y, center_x]
+                    cv2.putText(frameDisparity, f"{depth_value:.2f}m", (bbox[0] + 10, bbox[1] + 60), cv2.FONT_HERSHEY_TRIPLEX, 0.5, color)
             # Show the disparity frame
             cv2.imshow("disparity", frameDisparity)
 
