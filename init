@@ -1,0 +1,13 @@
+#Initializing Script for the OAK-D Pro Detection
+#!/bin/bash
+
+git clone https://github.com/luxonis/depthai-python.git
+cd depthai-python/examples
+python3 install_requirements.py
+
+
+cd ../..
+pip install depthai
+
+
+sudo python3 APDde.py

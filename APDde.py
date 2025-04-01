@@ -65,7 +65,7 @@ nn.input.setBlocking(False)
 
 # The NN model expects BGR input. By default ImageManip output type would be same as input (gray in this case)
 manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
-manip.initialConfig.setResize(300, 300)
+manip.initialConfig.setResize(300,300)
 
 # Linking
 videoEncoder.bitstream.link(videoOut.input)
@@ -150,6 +150,7 @@ with dai.Device(pipeline) as device:
                     center_x, center_y = int((bbox[0]+bbox[2])/2), int((bbox[1]+bbox[3])/2)
                     depth_value = depth_calculated[center_y, center_x]
                     cv2.putText(frameDisparity, f"{depth_value:.2f}m", (bbox[0] + 10, bbox[1] + 60), cv2.FONT_HERSHEY_TRIPLEX, 0.5, color)
+                    print(f"Item Classification: {labelMap[detection.label]}, Distance: {depth_value:.2f}m, Confidence: {int(detection.confidence*100)}%")
             # Show the disparity frame
             cv2.imshow("disparity", frameDisparity)
 
